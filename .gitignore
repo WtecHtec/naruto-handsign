@@ -4,3 +4,4 @@
 
 # IDE / Editor
 .vscode/
+.DS_Store

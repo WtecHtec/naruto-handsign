@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <title>火影忍者：结印修炼系统 - AI 驱动的忍术结印模拟器</title>
+    <meta name="description" content="体验真实的火影忍者结印！基于 AI (TensorFlow.js) 的手势识别网页应用。提供12种基础印记学习、豪火球/千鸟等忍术连招练习，以及从下忍到影级的晋升考试。挑战成功即可下载专属忍者证书。">
+    <meta name="keywords" content="火影忍者, 结印, 手势识别, AI, 网页游戏, 豪火球之术, 千鸟, 忍者考试, Naruto, Hand Signs, Jutsu, TensorFlow.js, Web Game">
+    <meta name="author" content="WtecHtec & Contributors">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://your-domain.com/" /> <meta property="og:type" content="website">
+    <meta property="og:url" content="https://your-domain.com/"> <meta property="og:title" content="来测试你的结印速度！火影忍者 AI 结印修炼场">
+    <meta property="og:description" content="我正在进行忍者等级考试！你能结出豪火球之术吗？无需下载，打开浏览器即可体验 AI 手势识别。">
+    <meta property="og:image" content="https://your-domain.com/assets/img/share-preview.jpg"> <meta property="og:locale" content="zh_CN">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="火影忍者：结印修炼系统">
+    <meta name="twitter:description" content="基于浏览器的 AI 结印识别。学习、练习、考试，获取你的影级证书！">
+    <meta name="twitter:image" content="https://your-domain.com/assets/img/share-preview.jpg">
+
+    <meta name="theme-color" content="#7F1D1D"> <link rel="icon" type="image/png" href="./assets/img/favicon.png"> <link rel="apple-touch-icon" href="./assets/img/apple-touch-icon.png">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Shojumaru&display=swap');
+        .ninja-font { font-family: 'Shojumaru', cursive; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        #webcam-container canvas { transform: scaleX(-1); width: 100%; height: 100%; object-fit: cover; border-radius: 0.5rem; }
+        .modal-enter { opacity: 0; transform: scale(0.9); }
+        .modal-enter-active { opacity: 1; transform: scale(1); transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+    </style>
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "火影忍者结印修炼系统",
+      "url": "https://your-domain.com/",
+      "description": "基于 AI 的火影忍者结印手势识别练习工具。",
+      "applicationCategory": "Game",
+      "operatingSystem": "Any",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "featureList": [
+        "AI 手势识别",
+        "12种基础结印学习",
+        "忍术连招练习",
+        "忍者等级考试系统",
+        "证书生成与下载"
+      ]
+    }
+    </script>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>火影忍者：忍者晋升之路</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Shojumaru&display=swap');
+        .ninja-font { font-family: 'Shojumaru', cursive; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        #webcam-container canvas { transform: scaleX(-1); width: 100%; height: 100%; object-fit: cover; border-radius: 0.5rem; }
+        
+        /* 弹窗动画 */
+        .modal-enter { opacity: 0; transform: scale(0.9); }
+        .modal-enter-active { opacity: 1; transform: scale(1); transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+    </style>
+</head>
+<body class="bg-gray-900 text-white h-screen flex flex-col font-sans overflow-hidden select-none">
+
+    <div id="game-modal" class="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center hidden backdrop-blur-sm">
+        <div class="bg-gray-800 border-4 border-yellow-600 rounded-lg w-11/12 max-w-md shadow-[0_0_30px_rgba(234,179,8,0.3)] transform transition-all p-6 text-center relative">
+            <h3 id="modal-title" class="text-3xl ninja-font text-red-500 mb-4 drop-shadow-md">标题</h3>
+            <div id="modal-content" class="text-gray-300 mb-6 text-lg">内容</div>
+            <div class="flex gap-2 justify-center">
+                <button id="modal-btn-cancel" class="hidden px-4 py-2 rounded border border-gray-600 hover:bg-gray-700">取消</button>
+                <button id="modal-btn-ok" class="px-6 py-2 rounded bg-red-700 hover:bg-red-600 text-white font-bold shadow-lg">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <header class="bg-red-900 border-b-4 border-yellow-500 p-3 shadow-lg flex justify-between items-center z-10 shrink-0">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center text-red-600 font-bold border-2 border-black text-xl">忍</div>
+            <h1 class="text-xl ninja-font text-yellow-400 tracking-wider hidden sm:block">忍者晋升之路</h1>
+        </div>
+        <nav class="flex bg-gray-800 rounded-lg p-1 gap-1">
+            <button data-mode="learn" class="nav-btn px-4 py-1.5 rounded font-bold text-sm transition text-gray-400 hover:text-white">学习</button>
+            <button data-mode="practice" class="nav-btn px-4 py-1.5 rounded font-bold text-sm transition text-gray-400 hover:text-white">练习</button>
+            <button data-mode="exam" class="nav-btn px-4 py-1.5 rounded font-bold text-sm transition text-gray-400 hover:text-white">考试</button>
+        </nav>
+    </header>
+
+    <main class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+        
+        <div class="w-full md:w-1/2 lg:w-3/5 bg-black relative flex flex-col items-center justify-center">
+            <div id="webcam-container" class="w-full h-full relative"></div>
+            <div class="absolute top-4 bg-gray-900/80 backdrop-blur px-4 py-2 rounded-full border border-yellow-500/50 flex items-center gap-3 shadow-lg z-20">
+                <span class="text-xs text-gray-400">SIGN:</span>
+                <span id="hud-current-sign" class="text-xl font-bold text-yellow-400 ninja-font tracking-widest">---</span>
+                <div class="w-12 h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                    <div id="hud-confidence" class="h-full bg-green-500 w-0 transition-all duration-200"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="w-full md:w-1/2 lg:w-2/5 bg-gray-800 border-l border-gray-700 relative flex flex-col h-[50vh] md:h-auto overflow-y-auto custom-scroll">
+            
+            <div id="panel-learn" class="mode-panel flex flex-col p-4 h-full hidden">
+                <h2 class="text-lg font-bold text-yellow-400 border-l-4 border-red-600 pl-2 mb-2">单印特训</h2>
+                <div id="learn-grid" class="grid grid-cols-4 sm:grid-cols-6 gap-2 mb-4 shrink-0"></div>
+                <div class="flex-1 bg-gray-900 rounded-lg border-2 border-dashed border-gray-700 p-4 flex flex-col items-center justify-center relative overflow-hidden" id="learn-display-area">
+                    <div id="learn-placeholder" class="text-gray-500 text-center"><p class="text-4xl mb-2">📜</p><p>点击上方印记学习</p></div>
+                    <div id="learn-content" class="hidden flex flex-col items-center w-full h-full">
+                        <h3 id="learn-name-cn" class="text-3xl font-bold text-white ninja-font mb-2"></h3>
+                        <img id="learn-image" src="" alt="Hand Sign" class="h-full max-h-[200px] object-contain drop-shadow-lg opacity-80">
+                        <div id="learn-status" class="mt-2 px-3 py-1 rounded-full text-xs font-bold bg-gray-700 text-gray-400">等待结印...</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="panel-practice" class="mode-panel flex flex-col p-6 h-full hidden">
+                <h2 class="text-lg font-bold text-green-400 border-l-4 border-green-600 pl-2 mb-4">自由练习</h2>
+                <div class="space-y-4">
+                    <select id="practice-select" class="w-full bg-gray-700 border border-gray-600 p-3 rounded text-white"></select>
+                    
+                    <div id="practice-area" class="hidden">
+                        <div class="bg-black/40 p-4 rounded-lg border border-gray-600 mb-4 text-center">
+                            <div class="flex justify-between items-center mb-4">
+                                <span class="text-xs text-gray-400">计时</span>
+                                <span id="practice-timer" class="font-mono text-xl text-green-400">0.00s</span>
+                            </div>
+                            <div id="practice-steps" class="flex flex-wrap justify-center gap-2"></div>
+                        </div>
+                        <button id="btn-reset-practice" class="w-full py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm font-bold mb-4">重置</button>
+                    </div>
+
+                    <div id="practice-history-container" class="hidden bg-gray-700/50 rounded-lg p-3">
+                        <h3 class="text-xs font-bold text-gray-400 mb-2 border-b border-gray-600 pb-1 flex justify-between">
+                            <span>历史最快 (Top 5)</span>
+                            <span class="text-[10px] font-normal cursor-pointer hover:text-white" id="btn-clear-history">清空</span>
+                        </h3>
+                        <ul id="practice-history-list" class="space-y-1 text-sm text-gray-300">
+                            </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div id="panel-exam" class="mode-panel flex flex-col p-6 h-full hidden">
+                <div class="flex justify-between items-end mb-4 border-b border-gray-700 pb-2">
+                    <h2 class="text-lg font-bold text-red-500 border-l-4 border-red-600 pl-2">等级考试</h2>
+                    <span id="current-rank-badge" class="text-xs bg-yellow-600 text-black font-bold px-2 py-0.5 rounded">...</span>
+                </div>
+                <div class="flex justify-between items-center mb-6 px-2 relative z-0">
+                    <div class="absolute top-1/2 left-0 right-0 h-1 bg-gray-700 -z-10"></div>
+                    <div id="exam-ranks-container" class="flex justify-between w-full"></div>
+                </div>
+                <div id="exam-main-card" class="flex-1 flex flex-col justify-center">
+                    <div class="bg-gray-700 p-6 rounded-lg text-center shadow-lg border-t-4 border-gray-500 relative overflow-hidden">
+                        <div class="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none"><span class="text-8xl font-bold">忍</span></div>
+                        <h3 id="exam-title" class="text-2xl font-bold text-white mb-2 relative z-10">---</h3>
+                        <p id="exam-desc" class="text-gray-300 text-xs mb-4 relative z-10">---</p>
+                        <div id="exam-task-list" class="text-left bg-gray-800/50 rounded p-3 mb-4 space-y-2 relative z-10 max-h-[120px] overflow-y-auto custom-scroll"></div>
+                        <button id="btn-start-exam" class="relative z-10 bg-red-600 hover:bg-red-500 text-white w-full py-3 rounded shadow-lg font-bold transition transform active:scale-95">开始挑战</button>
+                        <div id="exam-running-ui" class="hidden relative z-10">
+                            <div class="text-yellow-400 font-bold animate-pulse text-lg mb-1">正在结印判定...</div>
+                            <div id="exam-current-sequence-display" class="text-xs text-gray-400">请结印</div>
+                        </div>
+                    </div>
+                    <button id="btn-download-cert" class="hidden mt-4 w-full bg-yellow-600 hover:bg-yellow-500 text-black font-bold py-2 rounded flex items-center justify-center gap-2">下载当前等级证书</button>
+                </div>
+                <canvas id="cert-canvas" width="800" height="600" class="hidden"></canvas>
+            </div>
+
+        </div>
+    </main>
+    <script type="module" src="./assets/js/main.js"></script>
+</body>
+</html>

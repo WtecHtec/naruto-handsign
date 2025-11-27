@@ -1,0 +1,17 @@
+[
+    { "id": "bunshin", "name": "分身术", "sequence": ["Mi", "Tora"], "level": "genin" },
+    { "id": "henge", "name": "变身术", "sequence": ["Inu", "I"], "level": "genin" },
+    { "id": "kawarimi", "name": "替身术", "sequence": ["Tora", "I", "Ushi", "Inu", "Mi"], "level": "genin" },
+  
+    { "id": "katon", "name": "火遁·豪火球", "sequence": ["Mi", "Saru", "I", "Uma", "Tora"], "level": "chunin" },
+    { "id": "kagebunshin", "name": "多重影分身", "sequence": ["I", "Inu", "Tori", "Saru", "Uma"], "level": "chunin" },
+    { "id": "housenka", "name": "火遁·凤仙火", "sequence": ["Ne", "Tora", "Inu", "Ushi", "U", "Tora"], "level": "chunin" },
+  
+    { "id": "suiton", "name": "水遁·水龙弹", "sequence": ["Ushi", "Saru", "U", "Tora"], "level": "jonin" },
+    { "id": "chidori", "name": "雷遁·千鸟", "sequence": ["Ushi", "U", "Saru"], "level": "jonin" },
+    { "id": "kuchiyose", "name": "通灵之术", "sequence": ["I", "Inu", "Tori", "Saru", "Tora"], "level": "jonin" },
+  
+    { "id": "edo_tensei", "name": "秽土转生", "sequence": ["Tora", "Mi", "Inu", "Tatsu", "Release"], "level": "kage" },
+    { "id": "shiki_fujin", "name": "尸鬼封尽", "sequence": ["Mi", "I", "Tora", "Tatsu", "Tori", "Ne", "Inu"], "level": "kage" },
+    { "id": "hiraishin", "name": "飞雷神", "sequence": ["Tora", "Saru", "Ne", "Uma", "Inu", "Tora"], "level": "kage" }
+  ]

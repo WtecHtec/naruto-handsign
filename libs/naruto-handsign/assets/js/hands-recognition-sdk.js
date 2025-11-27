@@ -211,8 +211,7 @@ import {
       // 清空处理 canvas
       this.processedCanvasCtx.save();
       this.processedCanvasCtx.clearRect(0, 0, this.processedCanvas.width, this.processedCanvas.height);
-  
-  
+   
    
 
       // 处理手部检测结果
@@ -221,7 +220,7 @@ import {
       } else {
         
         
-        const cameraCtx =   this.webcam.canvas.getContext('2d');
+        const cameraCtx =  this.webcam.canvas.getContext('2d');
         cameraCtx.save();
         // 如果你想保留原视频，需要在清理前先把 tmImage.Webcam 的帧绘制到别的 canvas，再叠加关键点
         results.landmarks.forEach((landmarks) => {
