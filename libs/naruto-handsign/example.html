@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>火影手印识别 SDK - 示例</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      overflow: hidden;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      color: white;
+      padding: 30px;
+      text-align: center;
+    }
+
+    .header h1 {
+      font-size: 2.5em;
+      margin-bottom: 10px;
+    }
+
+    .header p {
+      font-size: 1.1em;
+      opacity: 0.9;
+    }
+
+    .content {
+      padding: 30px;
+    }
+
+    .webcam-section {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    #webcam-container {
+      display: inline-block;
+      border: 4px solid #667eea;
+      border-radius: 15px;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      background: #000;
+    }
+
+    .controls {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin: 20px 0;
+    }
+
+    button {
+      padding: 12px 30px;
+      font-size: 16px;
+      font-weight: bold;
+      border: none;
+      border-radius: 25px;
+      cursor: pointer;
+      transition: all 0.3s;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    #start-btn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    #stop-btn {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      color: white;
+    }
+
+    .result-section {
+      background: #f8f9fa;
+      border-radius: 15px;
+      padding: 25px;
+      margin: 20px 0;
+    }
+
+    .result-section h2 {
+      color: #667eea;
+      margin-bottom: 15px;
+      font-size: 1.5em;
+    }
+
+    .result-item {
+      background: white;
+      padding: 15px;
+      margin: 10px 0;
+      border-radius: 10px;
+      border-left: 4px solid #667eea;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .result-item strong {
+      color: #764ba2;
+      display: inline-block;
+      min-width: 120px;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 30px;
+      background: #e9ecef;
+      border-radius: 15px;
+      overflow: hidden;
+      margin: 10px 0;
+      position: relative;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+      transition: width 0.3s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+    }
+
+    .jutsu-match {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      color: white;
+      padding: 25px;
+      border-radius: 15px;
+      margin: 20px 0;
+      text-align: center;
+      animation: pulse 2s infinite;
+      display: none;
+    }
+
+    .jutsu-match.show {
+      display: block;
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        transform: scale(1);
+      }
+      50% {
+        transform: scale(1.02);
+      }
+    }
+
+    .jutsu-match h2 {
+      font-size: 2em;
+      margin-bottom: 10px;
+    }
+
+    .predictions-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 15px 0;
+    }
+
+    .prediction-tag {
+      background: rgba(255, 255, 255, 0.3);
+      padding: 8px 15px;
+      border-radius: 20px;
+      font-weight: bold;
+    }
+
+    .status {
+      text-align: center;
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 10px;
+      font-weight: bold;
+    }
+
+    .status.waiting {
+      background: #fff3cd;
+      color: #856404;
+    }
+
+    .status.running {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .status.error {
+      background: #f8d7da;
+      color: #721c24;
+    }
+
+    .info-box {
+      background: #e7f3ff;
+      border-left: 4px solid #2196F3;
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 5px;
+    }
+
+    .info-box p {
+      margin: 5px 0;
+      color: #0d47a1;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🔥 火影手印识别 SDK</h1>
+      <p>使用 MediaPipe 和 Teachable Machine 实现的实时手势识别</p>
+    </div>
+
+    <div class="content">
+      <!-- 状态显示 -->
+      <div id="status" class="status waiting">
+        等待启动识别...
+      </div>
+
+      <!-- 摄像头区域 -->
+      <div class="webcam-section">
+        <div id="webcam-container"></div>
+      </div>
+
+      <!-- 控制按钮 -->
+      <div class="controls">
+        <button id="start-btn">🚀 开始识别</button>
+        <button id="stop-btn" disabled>⏹️ 停止识别</button>
+      </div>
+
+      <!-- 识别结果 -->
+      <div class="result-section">
+        <h2>📊 识别结果</h2>
+        <div id="result-container">
+          <div class="info-box">
+            <p>点击"开始识别"按钮启动摄像头和手势识别</p>
+            <p>将手放在摄像头前，系统会自动识别手印</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 忍术匹配 -->
+      <div id="jutsu-container" class="jutsu-match">
+        <h2>🎉 匹配到忍术！</h2>
+        <div id="jutsu-name"></div>
+        <div class="predictions-list" id="jutsu-predictions"></div>
+      </div>
+
+      <!-- 预测序列 -->
+      <div class="result-section">
+        <h2>📝 预测序列</h2>
+        <div id="predictions-container">
+          <p style="color: #999;">暂无预测数据</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 依赖库 -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+
+  <!-- 使用 SDK -->
+  <script type="module">
+    // 导入 SDK（假设 SDK 文件在 assets/js 目录下）
+    import HandsRecognitionSDK  from './assets/js/hands-recognition-sdk.js';
+
+    let sdk = null;
+    let isInitialized = false;
+
+    // DOM 元素
+    const startBtn = document.getElementById('start-btn');
+    const stopBtn = document.getElementById('stop-btn');
+    const statusDiv = document.getElementById('status');
+    const resultContainer = document.getElementById('result-container');
+    const jutsuContainer = document.getElementById('jutsu-container');
+    const jutsuName = document.getElementById('jutsu-name');
+    const jutsuPredictions = document.getElementById('jutsu-predictions');
+    const predictionsContainer = document.getElementById('predictions-container');
+
+    // 更新状态
+    function updateStatus(text, type = 'waiting') {
+      statusDiv.textContent = text;
+      statusDiv.className = `status ${type}`;
+    }
+
+    // 初始化 SDK
+    async function initSDK() {
+      if (isInitialized) {
+        return true;
+      }
+
+      try {
+        updateStatus('正在初始化 SDK...', 'waiting');
+
+        sdk = new HandsRecognitionSDK({
+          cameraWidth: 400,
+          cameraHeight: 400,
+          threshold: 5,
+          mountContainer: '#webcam-container',
+          mediapipeModelPath: './assets/models/mediapipe/hand_landmarker.task',
+          teachableMachineModelPath: './assets/models/teachable-machine/',
+          jutsusPath: './assets/jutsus.json'
+        });
+
+        // 设置识别结果回调
+        sdk.onResult((result) => {
+          updateResult(result);
+        });
+
+        // 设置忍术匹配回调
+        sdk.onJutsuMatch((match) => {
+          showJutsuMatch(match);
+        });
+
+        // 设置无手部检测回调
+        sdk.onNoHands(() => {
+          resultContainer.innerHTML = `
+            <div class="info-box">
+              <p>⚠️ 未检测到手部</p>
+              <p>请将手放在摄像头前</p>
+            </div>
+          `;
+        });
+
+        // 初始化模型
+        const initResult = await sdk.init();
+        if (!initResult.success) {
+          throw new Error(initResult.error || '初始化失败');
+        }
+
+        isInitialized = true;
+        updateStatus('SDK 初始化成功', 'running');
+        return true;
+      } catch (error) {
+        console.error('初始化失败:', error);
+        updateStatus(`初始化失败: ${error.message}`, 'error');
+        return false;
+      }
+    }
+
+    // 更新识别结果
+    function updateResult(result) {
+      const progress = (result.progress * 100).toFixed(0);
+      
+      resultContainer.innerHTML = `
+        <div class="result-item">
+          <strong>当前手势:</strong>
+          <span style="font-size: 1.2em; color: #667eea; font-weight: bold;">
+            ${result.currentPrediction}
+          </span>
+        </div>
+        <div class="result-item">
+          <strong>识别进度:</strong>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width: ${progress}%">
+              ${progress}%
+            </div>
+          </div>
+        </div>
+      `;
+
+      // 更新预测序列
+      if (result.allPredictions.length > 0) {
+        predictionsContainer.innerHTML = `
+          <div class="predictions-list">
+            ${result.allPredictions.map((pred, index) => `
+              <div class="prediction-tag" style="background: ${index === result.allPredictions.length - 1 ? '#667eea' : '#e9ecef'}; color: ${index === result.allPredictions.length - 1 ? 'white' : '#333'};">
+                ${index + 1}. ${pred}
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
+    }
+
+    // 显示忍术匹配
+    function showJutsuMatch(match) {
+      jutsuName.innerHTML = `<h3 style="font-size: 1.5em; margin: 10px 0;">${match.jutsuName}</h3>`;
+      jutsuPredictions.innerHTML = match.predictions.map((pred, index) => `
+        <div class="prediction-tag">${index + 1}. ${pred}</div>
+      `).join('');
+      
+      jutsuContainer.classList.add('show');
+      
+      // 3秒后自动隐藏
+      setTimeout(() => {
+        jutsuContainer.classList.remove('show');
+      }, 3000);
+    }
+
+    // 启动识别
+    async function startRecognition() {
+      try {
+        // 先初始化
+        const initialized = await initSDK();
+        if (!initialized) {
+          return;
+        }
+
+        updateStatus('正在启动摄像头...', 'waiting');
+
+        // 启动识别
+        const startResult = await sdk.start();
+        if (!startResult.success) {
+          throw new Error(startResult.error || '启动失败');
+        }
+
+        // 更新 UI
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+        updateStatus('✅ 识别运行中...', 'running');
+        resultContainer.innerHTML = `
+          <div class="info-box">
+            <p>✅ 识别已启动</p>
+            <p>将手放在摄像头前开始识别</p>
+          </div>
+        `;
+      } catch (error) {
+        console.error('启动失败:', error);
+        updateStatus(`启动失败: ${error.message}`, 'error');
+        alert('启动失败: ' + error.message);
+      }
+    }
+
+    // 停止识别
+    function stopRecognition() {
+      if (sdk) {
+        sdk.stop();
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+        updateStatus('⏹️ 识别已停止', 'waiting');
+        resultContainer.innerHTML = `
+          <div class="info-box">
+            <p>识别已停止</p>
+            <p>点击"开始识别"重新启动</p>
+          </div>
+        `;
+        predictionsContainer.innerHTML = '<p style="color: #999;">暂无预测数据</p>';
+        jutsuContainer.classList.remove('show');
+      }
+    }
+
+    // 绑定事件
+    startBtn.addEventListener('click', startRecognition);
+    stopBtn.addEventListener('click', stopRecognition);
+
+    // 页面卸载时停止识别
+    window.addEventListener('beforeunload', () => {
+      if (sdk) {
+        sdk.stop();
+      }
+    });
+  </script>
+</body>
+</html>
