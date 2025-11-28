@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YOLOX SDK Demo</title>
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+    <script src="./yolox_sdk.js"></script>
+
+    <style>
+        body { font-family: "Microsoft JhengHei", sans-serif; text-align: center; background: #f4f4f4; padding: 20px;}
+        .container { position: relative; display: inline-block; background: #000; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+        video, img { display: block; max-width: 100%; }
+        canvas { position: absolute; top: 0; left: 0; pointer-events: none; }
+        .controls { margin-bottom: 20px; }
+        button { padding: 8px 16px; margin: 0 5px; cursor: pointer; border: none; background: #007bff; color: white; border-radius: 4px; }
+        button:disabled { background: #ccc; }
+    </style>
+</head>
+<body>
+
+    <h1>火影結印識別 (SDK 版)</h1>
+    
+    <div class="controls">
+        <button id="btn-cam" onclick="startCamera()" disabled>開啟攝像頭</button>
+        <button id="btn-upload" onclick="document.getElementById('file-upload').click()" disabled>上傳圖片</button>
+        <input type="file" id="file-upload" accept="image/*" style="display: none;" onchange="handleImageUpload(this)">
+        <p id="status">正在初始化 SDK...</p>
+    </div>
+
+    <div class="container" id="display-container">
+        <video id="input-video" playsinline muted style="display:none"></video>
+        <img id="input-image" style="display:none">
+        <canvas id="output-canvas"></canvas>
+    </div>
+
+<script>
+    // --- 實例化 SDK ---
+    const detector = new YoloxSDK({
+        modelPath: './yolox_nano.onnx',
+        scoreTh: 0.5,
+        nmsTh: 0.45
+    });
+
+    let isVideoMode = false;
+    let animationId = null;
+
+    // --- 1. 初始化 ---
+    detector.load().then(() => {
+        document.getElementById('status').innerText = "SDK 就緒，請選擇輸入源。";
+        document.getElementById('btn-cam').disabled = false;
+        document.getElementById('btn-upload').disabled = false;
+    }).catch(err => {
+        document.getElementById('status').innerText = "模型加載失敗，請檢查控制台。";
+    });
+
+    // --- 2. 業務邏輯：處理圖片 ---
+    async function handleImageUpload(input) {
+        stopCamera();
+        const file = input.files[0];
+        if (!file) return;
+
+        const img = document.getElementById('input-image');
+        const video = document.getElementById('input-video');
+        
+        video.style.display = 'none';
+        img.style.display = 'block';
+        img.src = URL.createObjectURL(file);
+        
+        img.onload = async () => {
+            adjustCanvas(img.naturalWidth, img.naturalHeight);
+            
+            // 調用 SDK
+            const start = performance.now();
+            const results = await detector.detect(img);
+            const end = performance.now();
+
+            // 渲染 UI
+            renderUI(results, img.naturalWidth, img.naturalHeight);
+            updateStatus(end - start, results.length);
+        };
+    }
+
+    // --- 3. 業務邏輯：處理視頻流 ---
+    async function startCamera() {
+        stopCamera();
+        isVideoMode = true;
+
+        const video = document.getElementById('input-video');
+        const img = document.getElementById('input-image');
+        img.style.display = 'none';
+        video.style.display = 'block';
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'environment' }
+        });
+        video.srcObject = stream;
+        video.play();
+
+        video.onloadedmetadata = () => {
+            adjustCanvas(video.videoWidth, video.videoHeight);
+            requestAnimationFrame(videoLoop);
+        };
+    }
+
+    async function videoLoop() {
+        if (!isVideoMode) return;
+        const video = document.getElementById('input-video');
+
+        if (video.readyState >= 2) {
+            // 調用 SDK
+            const start = performance.now();
+            const results = await detector.detect(video);
+            const end = performance.now();
+
+            // 渲染 UI
+            renderUI(results, video.videoWidth, video.videoHeight);
+            updateStatus(end - start, results.length);
+        }
+        animationId = requestAnimationFrame(videoLoop);
+    }
+
+    function stopCamera() {
+        isVideoMode = false;
+        if (animationId) cancelAnimationFrame(animationId);
+        const video = document.getElementById('input-video');
+        if (video.srcObject) {
+            video.srcObject.getTracks().forEach(track => track.stop());
+            video.srcObject = null;
+        }
+    }
+
+    // --- 4. UI 渲染輔助函數 (與 SDK 解耦) ---
+    function adjustCanvas(w, h) {
+        const canvas = document.getElementById('output-canvas');
+        canvas.width = w;
+        canvas.height = h;
+        // 調整容器大小以適配
+        const container = document.getElementById('display-container');
+        container.style.width = w + 'px';
+        container.style.height = h + 'px';
+    }
+
+    function renderUI(boxes, w, h) {
+        const canvas = document.getElementById('output-canvas');
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, w, h);
+        
+        ctx.lineWidth = 3;
+        ctx.font = "bold 20px sans-serif";
+
+        boxes.forEach(box => {
+            const color = '#00FF00';
+            
+            // 畫框
+            ctx.strokeStyle = color;
+            ctx.strokeRect(box.x1, box.y1, box.x2 - box.x1, box.y2 - box.y1);
+            
+            // 畫文字標籤
+            const text = `${box.label} ${(box.score * 100).toFixed(0)}%`;
+            ctx.fillStyle = color;
+            ctx.fillRect(box.x1, box.y1 - 24, ctx.measureText(text).width + 10, 24);
+            
+            ctx.fillStyle = 'black';
+            ctx.fillText(text, box.x1 + 5, box.y1 - 5);
+        });
+    }
+
+    function updateStatus(time, count) {
+        document.getElementById('status').innerText = `耗時: ${time.toFixed(1)}ms | 檢測目標: ${count}`;
+    }
+</script>
+</body>
+</html>
