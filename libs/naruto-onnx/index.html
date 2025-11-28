@@ -3,12 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>火影忍者：结印大师 (最终修复版)</title>
+ 
+
+    <title>火影忍者：结印修炼系统 - AI 驱动的忍术结印模拟器</title>
+    <meta name="description" content="体验真实的火影忍者结印！基于 AI (TensorFlow.js) 的手势识别网页应用。提供12种基础印记学习、豪火球/千鸟等忍术连招练习，以及从下忍到影级的晋升考试。挑战成功即可下载专属忍者证书。">
+    <meta name="keywords" content="火影忍者, 结印, 手势识别, AI, 网页游戏, 豪火球之术, 千鸟, 忍者考试, Naruto, Hand Signs, Jutsu, TensorFlow.js, Web Game">
+    <meta name="author" content="WtecHtec & Contributors">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://your-domain.com/" /> <meta property="og:type" content="website">
+    <meta property="og:url" content="https://your-domain.com/"> <meta property="og:title" content="来测试你的结印速度！火影忍者 AI 结印修炼场">
+    <meta property="og:description" content="我正在进行忍者等级考试！你能结出豪火球之术吗？无需下载，打开浏览器即可体验 AI 手势识别。">
+    <meta property="og:image" content="https://your-domain.com/assets/img/share-preview.jpg"> <meta property="og:locale" content="zh_CN">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="火影忍者：结印修炼系统">
+    <meta name="twitter:description" content="基于浏览器的 AI 结印识别。学习、练习、考试，获取你的影级证书！">
     
+
+
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2463152068592975"
+    crossOrigin="anonymous" />
+
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1234567890123456"
+    crossorigin="anonymous"></script>
+    
+
     <script src="https://cdn.tailwindcss.com"></script>
     
     <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
-    <script src="yolox_sdk.js"></script>
+    <script src="./yolox_sdk.js"></script>
 
     <style>
         /* 写轮眼动画 */
@@ -100,7 +123,8 @@
                         </div>
                         <div class="flex gap-4">
                             <div class="w-24 h-24 bg-gray-800 rounded-lg flex items-center justify-center border border-gray-600 shrink-0">
-                                <span id="preview-img-text" class="text-4xl font-bold text-gray-500">子</span>
+                                <!-- <span id="preview-img-text" class="text-4xl font-bold text-gray-500">子</span> -->
+                                <img id="preview-img" class="text-4xl font-bold text-gray-500 w-full h-full "></img>
                             </div>
                             <div class="flex-1 flex flex-col justify-center">
                                 <span class="text-sm text-gray-400">识别状态:</span>
@@ -344,7 +368,8 @@
             this.state.targetSign = sign;
             document.getElementById('learning-preview').classList.remove('hidden');
             document.getElementById('preview-title').innerText = `${sign} (${HAND_SIGNS[sign].code})`;
-            document.getElementById('preview-img-text').innerText = sign;
+            // document.getElementById('preview-img-text').innerText = sign;
+            document.getElementById('preview-img').src = `./imgs/${HAND_SIGNS[sign].code}.png`;
             document.getElementById('learning-status').innerText = "请结印...";
         },
         stopLearning() { this.state.targetSign = null; document.getElementById('learning-preview').classList.add('hidden'); },
