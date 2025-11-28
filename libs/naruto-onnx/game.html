@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>火影忍者：结印大师 (终极版)</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+    <script src="yolox_sdk.js"></script>
+
+    <style>
+        /* 写轮眼动画核心样式 */
+        .sharingan-loader {
+            width: 120px; height: 120px;
+            background: #e74c3c;
+            border-radius: 50%;
+            border: 6px solid #000;
+            position: relative;
+            box-shadow: 0 0 20px #e74c3c;
+            display: flex; justify-content: center; align-items: center;
+            animation: pulse-eye 2s infinite;
+        }
+        .pupil {
+            width: 25px; height: 25px;
+            background: #000; border-radius: 50%;
+            z-index: 10;
+        }
+        .tomoe-ring {
+            position: absolute; width: 100%; height: 100%;
+            animation: spin 3s linear infinite;
+        }
+        .tomoe {
+            position: absolute; width: 20px; height: 20px;
+            background: #000; border-radius: 50%;
+        }
+        /* 勾玉尾巴模拟 */
+        .tomoe::before {
+            content: ''; position: absolute; top: -5px; left: -2px;
+            width: 0; height: 0;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-bottom: 18px solid #000;
+            transform: rotate(-30deg); border-radius: 50%;
+        }
+        .tomoe:nth-child(1) { top: 10px; left: 50%; transform: translateX(-50%) rotate(0deg); }
+        .tomoe:nth-child(2) { bottom: 20px; left: 15px; transform: rotate(120deg); }
+        .tomoe:nth-child(3) { bottom: 20px; right: 15px; transform: rotate(240deg); }
+
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        @keyframes pulse-eye { 0%, 100% { box-shadow: 0 0 20px #e74c3c; } 50% { box-shadow: 0 0 50px #c0392b; } }
+        
+        /* 视频镜像 */
+        .mirror-video { transform: scaleX(-1); }
+
+        /* 滚动条美化 */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 font-sans h-screen overflow-hidden select-none">
+
+    <div id="loading-mask" class="fixed inset-0 z-50 bg-black flex flex-col justify-center items-center transition-opacity duration-500">
+        <div class="sharingan-loader mb-8">
+            <div class="pupil"></div>
+            <div class="tomoe-ring">
+                <div class="tomoe"></div>
+                <div class="tomoe"></div>
+                <div class="tomoe"></div>
+            </div>
+        </div>
+        <h2 class="text-2xl font-bold text-red-500 animate-pulse">正在开启万花筒写轮眼...</h2>
+        <p class="text-gray-500 mt-2 text-sm">加载 AI 模型 & 初始化摄像头</p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-[1fr_450px] h-full">
+        
+        <div class="relative bg-black flex items-center justify-center border-r border-gray-800 overflow-hidden">
+            <div class="relative w-full h-full flex items-center justify-center">
+                <video id="input-video" playsinline muted class="absolute w-full h-full object-contain mirror-video"></video>
+                <canvas id="output-canvas" class="absolute w-full h-full object-contain mirror-video"></canvas>
+                
+                <div id="hit-feedback" class="absolute inset-0 pointer-events-none border-[10px] border-green-500 opacity-0 transition-opacity duration-200"></div>
+
+                <div id="toast-container" class="absolute top-10 left-1/2 -translate-x-1/2 flex flex-col gap-2 pointer-events-none z-20 w-auto">
+                    </div>
+            </div>
+        </div>
+
+        <div class="flex flex-col bg-gray-800 shadow-2xl z-10">
+            <div class="p-6 border-b border-gray-700 flex justify-between items-center bg-gray-900">
+                <div>
+                    <h1 class="text-2xl font-bold text-orange-500 tracking-wider">结印大师</h1>
+                    <div id="status-text" class="text-xs text-gray-400 mt-1">等待指令...</div>
+                </div>
+                <div class="px-3 py-1 bg-yellow-600 text-black text-sm font-bold rounded shadow-lg shadow-yellow-500/20" id="player-rank">
+                    见习忍者
+                </div>
+            </div>
+
+            <div class="flex p-2 gap-2 bg-gray-800">
+                <button onclick="Game.switchTab('learning')" class="tab-btn flex-1 py-2 text-sm font-bold rounded transition-colors bg-orange-600 text-white hover:bg-orange-500">基础修行</button>
+                <button onclick="Game.switchTab('practice')" class="tab-btn flex-1 py-2 text-sm font-bold rounded transition-colors bg-gray-700 text-gray-400 hover:bg-gray-600">忍术演练</button>
+                <button onclick="Game.switchTab('exam')" class="tab-btn flex-1 py-2 text-sm font-bold rounded transition-colors bg-gray-700 text-gray-400 hover:bg-red-900 hover:text-red-200">晋升考试</button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4 relative">
+                
+                <div id="panel-learning" class="mode-panel space-y-4">
+                    <p class="text-sm text-gray-400">点击下方结印符号开始单项练习：</p>
+                    <div id="learning-grid" class="grid grid-cols-4 gap-3">
+                        </div>
+
+                    <div id="learning-preview" class="hidden bg-gray-700 rounded-xl p-4 border-2 border-orange-500 animate-[fadeIn_0.3s_ease-out]">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 id="preview-title" class="text-xl font-bold">子 (Ne)</h3>
+                            <button onclick="Game.stopLearning()" class="text-xs bg-red-600 px-2 py-1 rounded hover:bg-red-500">关闭</button>
+                        </div>
+                        <div class="aspect-video bg-gray-800 rounded-lg flex items-center justify-center mb-4 border border-gray-600">
+                            <span id="preview-img-text" class="text-6xl font-bold text-gray-500 select-none">子</span>
+                        </div>
+                        <div class="text-center">
+                            <span class="text-sm text-gray-400">当前检测状态:</span>
+                            <div id="learning-status" class="text-lg font-bold text-yellow-500 mt-1">检测中...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="panel-practice" class="mode-panel hidden space-y-3">
+                    </div>
+
+                <div id="panel-exam" class="mode-panel hidden flex flex-col items-center justify-center h-full text-center space-y-6">
+                    <div class="w-24 h-24 rounded-full bg-red-900 flex items-center justify-center border-4 border-red-500 shadow-[0_0_30px_rgba(239,68,68,0.3)]">
+                        <span class="text-4xl">忍</span>
+                    </div>
+                    <div>
+                        <h3 class="text-2xl font-bold mb-2">忍者等级认定考试</h3>
+                        <p class="text-gray-400 text-sm max-w-xs mx-auto">你需要连续完成 3 个指定难度的忍术，且不能失败。通过后可获得等级证书。</p>
+                    </div>
+                    <button onclick="Game.startExam()" class="w-full max-w-xs py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg shadow-lg transform transition active:scale-95">
+                        开始挑战
+                    </button>
+                </div>
+            </div>
+
+            <div id="active-hud" class="hidden border-t border-gray-700 bg-gray-900 p-4 animate-[slideUp_0.3s]">
+                <div class="flex justify-between items-end mb-3">
+                    <div>
+                        <div class="text-xs text-green-400 font-bold mb-1">正在结印</div>
+                        <div id="hud-title" class="text-xl font-bold text-white">豪火球之术</div>
+                    </div>
+                    <div id="hud-timer" class="text-2xl font-mono text-yellow-400">0.0s</div>
+                </div>
+                
+                <div id="hud-seq" class="flex gap-2 flex-wrap mb-4">
+                    </div>
+
+                <button onclick="Game.stopGame()" class="w-full py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm font-bold text-gray-300">
+                    放弃结印
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="custom-modal" class="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-gray-800 w-full max-w-md p-6 rounded-xl border border-gray-600 shadow-2xl transform scale-95 transition-transform duration-300" id="modal-content">
+            <h3 id="modal-title" class="text-xl font-bold text-white mb-2">提示</h3>
+            <p id="modal-body" class="text-gray-300 mb-6">内容...</p>
+            <div class="flex justify-end gap-3">
+                <button id="modal-btn-cancel" class="px-4 py-2 rounded text-gray-400 hover:bg-gray-700 hidden" onclick="UI.hideModal()">取消</button>
+                <button id="modal-btn-confirm" class="px-4 py-2 rounded bg-orange-600 hover:bg-orange-500 text-white font-bold" onclick="UI.hideModal()">确定</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // --- 1. 数据库扩充 (15+ 忍术) ---
+    const HAND_SIGNS = {
+        "子": { code: "Ne", label: "鼠" }, "丑": { code: "Ushi", label: "牛" }, "寅": { code: "Tora", label: "虎" },
+        "卯": { code: "U", label: "兔" },   "辰": { code: "Tatsu", label: "龙" }, "巳": { code: "Mi", label: "蛇" },
+        "午": { code: "Uma", label: "马" }, "未": { code: "Hitsuji", label: "羊" },"申": { code: "Saru", label: "猴" },
+        "酉": { code: "Tori", label: "鸡" }, "戌": { code: "Inu", label: "狗" },   "亥": { code: "I", label: "猪" },
+        "祈": { code: "Gassho", label: "合" }, "壬": { code: "Mizunoe", label: "壬" }
+    };
+
+    const JUTSU_DB = [
+        // D级
+        { name: "替身术", rank: "D", seq: ["寅", "亥", "丑", "戌", "巳"] },
+        { name: "分身术", rank: "D", seq: ["未", "巳", "寅"] },
+        { name: "变身术", rank: "D", seq: ["戌", "亥", "未"] },
+        { name: "瞬身术", rank: "D", seq: ["寅"] },
+        // C级
+        { name: "火遁·豪火球", rank: "C", seq: ["巳", "未", "申", "亥", "午", "寅"] },
+        { name: "火遁·凤仙火", rank: "C", seq: ["子", "寅", "戌", "丑", "卯", "寅"] },
+        { name: "雷遁·地走", rank: "C", seq: ["寅", "巳", "寅", "巳", "寅"] },
+        { name: "土遁·土流壁", rank: "C", seq: ["寅", "巳", "寅", "巳", "寅", "巳"] },
+        // B级
+        { name: "千鸟/雷切", rank: "B", seq: ["丑", "卯", "申"] },
+        { name: "火遁·龙火之术", rank: "B", seq: ["巳", "辰", "卯", "寅"] },
+        { name: "水遁·水乱波", rank: "B", seq: ["辰", "丑", "卯"] },
+        { name: "潜影蛇手", rank: "B", seq: ["寅", "子", "未", "子", "寅"] },
+        // A级
+        { name: "水遁·大瀑布", rank: "A", seq: ["寅", "丑", "申", "卯", "子", "亥", "酉", "丑", "午", "戌", "寅", "戌", "寅"] },
+        { name: "封印术·尸鬼封尽", rank: "A", seq: ["巳", "亥", "未", "卯", "戌", "子", "酉", "午", "巳", "祈"] },
+        { name: "秽土转生", rank: "A", seq: ["寅", "巳", "戌", "辰", "祈"] },
+        // S级
+        { name: "水遁·水龙弹", rank: "S", seq: ["子", "丑", "申", "卯", "子", "亥", "酉", "丑", "午", "戌", "寅", "戌", "寅", "巳", "丑", "申", "卯"] },
+    ];
+
+    // --- 2. UI 工具类 (替换 Alert) ---
+    const UI = {
+        showModal: (title, body, onConfirm = null) => {
+            const el = document.getElementById('custom-modal');
+            const content = document.getElementById('modal-content');
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-body').innerText = body;
+            
+            const btn = document.getElementById('modal-btn-confirm');
+            // 清除旧事件
+            const newBtn = btn.cloneNode(true);
+            btn.parentNode.replaceChild(newBtn, btn);
+            
+            newBtn.onclick = () => {
+                UI.hideModal();
+                if(onConfirm) onConfirm();
+            };
+
+            el.classList.remove('hidden');
+            // 动画
+            requestAnimationFrame(() => {
+                el.classList.remove('opacity-0');
+                content.classList.remove('scale-95');
+            });
+        },
+
+        hideModal: () => {
+            const el = document.getElementById('custom-modal');
+            const content = document.getElementById('modal-content');
+            el.classList.add('opacity-0');
+            content.classList.add('scale-95');
+            setTimeout(() => el.classList.add('hidden'), 300);
+        },
+
+        showToast: (msg, type = 'normal') => {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            let bgClass = 'bg-gray-800 border-gray-600';
+            if(type === 'success') bgClass = 'bg-green-900/90 border-green-500 text-green-100';
+            if(type === 'warn') bgClass = 'bg-yellow-900/90 border-yellow-500 text-yellow-100';
+
+            toast.className = `px-4 py-2 rounded-lg border shadow-lg text-sm font-bold backdrop-blur-sm animate-[fadeInUp_0.3s] ${bgClass}`;
+            toast.innerText = msg;
+            
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-[-10px]');
+                setTimeout(() => toast.remove(), 300);
+            }, 2000);
+        },
+
+        toggleLoader: (show) => {
+            const el = document.getElementById('loading-mask');
+            if(show) {
+                el.classList.remove('hidden');
+            } else {
+                el.classList.add('opacity-0');
+                setTimeout(() => el.classList.add('hidden'), 500);
+            }
+        },
+
+        updateTabStyle: (activeTab) => {
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                // 重置所有
+                btn.className = "tab-btn flex-1 py-2 text-sm font-bold rounded transition-colors bg-gray-700 text-gray-400 hover:bg-gray-600";
+            });
+            // 激活当前 (根据点击的事件或ID，这里简化逻辑，在HTML的onclick里手动重置可能更好，或者直接用状态管理)
+            // 简单处理：我们根据 tab name 重新设置 class
+             const tabs = {
+                'learning': document.querySelector('button[onclick="Game.switchTab(\'learning\')"]'),
+                'practice': document.querySelector('button[onclick="Game.switchTab(\'practice\')"]'),
+                'exam': document.querySelector('button[onclick="Game.switchTab(\'exam\')"]')
+            };
+            if(tabs[activeTab]) {
+                tabs[activeTab].className = "tab-btn flex-1 py-2 text-sm font-bold rounded transition-colors bg-orange-600 text-white hover:bg-orange-500 shadow-lg shadow-orange-500/20";
+            }
+        }
+    };
+
+    // --- 3. 游戏逻辑核心 ---
+    const Game = {
+        sdk: null,
+        video: null,
+        canvas: null,
+        ctx: null,
+        
+        state: {
+            mode: 'learning',
+            targetSign: null,
+            currentJutsu: null,
+            seqIndex: 0,
+            startTime: 0,
+            isPlaying: false,
+            lastTime: 0,
+            
+            examQueue: [],
+            examIdx: 0
+        },
+
+        init: async function() {
+            this.video = document.getElementById('input-video');
+            this.canvas = document.getElementById('output-canvas');
+            this.ctx = this.canvas.getContext('2d');
+            
+            this.renderLearningGrid();
+            this.renderPracticeList();
+            this.updateRankDisplay();
+
+            // 延迟一点以展示写轮眼动画 (Mock loading feel)
+            setTimeout(async () => {
+                try {
+                    this.sdk = new YoloxSDK({
+                        modelPath: './yolox_nano.onnx', scoreTh: 0.65, nmsTh: 0.45
+                    });
+                    await this.sdk.load();
+                    
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        video: { width: {ideal: 1280}, height: {ideal: 720}, facingMode: "user" }
+                    });
+                    this.video.srcObject = stream;
+                    this.video.play();
+                    
+                    this.video.onloadedmetadata = () => {
+                        this.resizeCanvas();
+                        UI.toggleLoader(false); // 关闭写轮眼
+                        this.loop();
+                        UI.showToast("系统启动完成", "success");
+                    };
+                    
+                    window.addEventListener('resize', () => this.resizeCanvas());
+
+                } catch(e) {
+                    UI.toggleLoader(false);
+                    UI.showModal("初始化失败", "无法加载模型或摄像头。\n请确保允许摄像头权限并使用 HTTPS 或 localhost。\n错误: " + e.message);
+                }
+            }, 1500); // 强制显示 1.5s 动画
+        },
+
+        resizeCanvas: function() {
+            this.canvas.width = this.video.videoWidth;
+            this.canvas.height = this.video.videoHeight;
+        },
+
+        loop: async function() {
+            if(!this.video.paused && !this.video.ended) {
+                const results = await this.sdk.detect(this.video);
+                
+                this.ctx.clearRect(0,0,this.canvas.width, this.canvas.height);
+                this.ctx.save();
+                this.ctx.scale(-1, 1);
+                this.ctx.drawImage(this.video, -this.canvas.width, 0, this.canvas.width, this.canvas.height);
+                this.ctx.restore();
+
+                this.drawBoxes(results);
+
+                if(this.state.mode === 'learning') {
+                    this.logicLearning(results);
+                } else if(this.state.isPlaying) {
+                    this.logicSequence(results);
+                }
+            }
+            requestAnimationFrame(() => this.loop());
+        },
+
+        drawBoxes(results) {
+            this.ctx.lineWidth = 4;
+            this.ctx.font = "bold 24px Arial";
+            results.forEach(box => {
+                const x1 = this.canvas.width - box.x2; // 镜像
+                const w = box.x2 - box.x1;
+                this.ctx.strokeStyle = "#22c55e"; // Tailwind green-500
+                this.ctx.strokeRect(x1, box.y1, w, box.y2 - box.y1);
+                
+                // 标签背景
+                const text = box.label;
+                const textW = this.ctx.measureText(text).width;
+                this.ctx.fillStyle = "#22c55e";
+                this.ctx.fillRect(x1, box.y1 - 30, textW + 10, 30);
+                this.ctx.fillStyle = "#000";
+                this.ctx.fillText(text, x1 + 5, box.y1 - 6);
+            });
+        },
+
+        // --- 逻辑：基础模式 ---
+        logicLearning(results) {
+            if(!this.state.targetSign) return;
+            const statusEl = document.getElementById('learning-status');
+            
+            // 简单防抖
+            const best = results[0];
+            if(best && best.label === this.state.targetSign) {
+                statusEl.innerHTML = "<span class='text-green-400'>✔ 匹配成功!</span>";
+                statusEl.className = "text-lg font-bold text-green-400 mt-1 animate-pulse";
+                this.triggerFeedback();
+            } else {
+                statusEl.innerText = "检测中...";
+                statusEl.className = "text-lg font-bold text-yellow-500 mt-1";
+            }
+        },
+
+        // --- 逻辑：忍术序列 ---
+        logicSequence(results) {
+            const now = performance.now();
+            document.getElementById('hud-timer').innerText = ((now - this.state.startTime)/1000).toFixed(1) + 's';
+
+            if(results.length === 0) return;
+            if(now - this.state.lastTime < 500) return; // 500ms 冷却
+
+            const target = this.state.currentJutsu.seq[this.state.seqIndex];
+            const best = results[0];
+
+            if(best.label === target) {
+                this.state.lastTime = now;
+                this.advanceSequence();
+            }
+        },
+
+        advanceSequence() {
+            this.triggerFeedback();
+            UI.showToast(`结印: ${this.state.currentJutsu.seq[this.state.seqIndex]}`, 'success');
+            
+            // Update HUD
+            const items = document.getElementById('hud-seq').children;
+            if(items[this.state.seqIndex]) {
+                items[this.state.seqIndex].className = "w-10 h-12 flex items-center justify-center bg-green-600 text-white rounded font-bold shadow-lg scale-100 transition-all";
+            }
+
+            this.state.seqIndex++;
+
+            if(this.state.seqIndex >= this.state.currentJutsu.seq.length) {
+                // 完成
+                this.state.isPlaying = false;
+                const time = document.getElementById('hud-timer').innerText;
+                
+                if(this.state.mode === 'exam') {
+                    this.nextExamItem();
+                } else {
+                    UI.showModal("忍术发动成功!", `耗时: ${time}`, () => {
+                        this.stopGame();
+                    });
+                }
+            } else {
+                if(items[this.state.seqIndex]) {
+                    items[this.state.seqIndex].className = "w-10 h-12 flex items-center justify-center bg-gray-700 text-white rounded font-bold border-2 border-orange-500 scale-110 shadow-[0_0_15px_rgba(249,115,22,0.5)] transition-all";
+                }
+            }
+        },
+
+        triggerFeedback() {
+            const el = document.getElementById('hit-feedback');
+            el.classList.remove('opacity-0');
+            setTimeout(() => el.classList.add('opacity-0'), 200);
+        },
+
+        // --- 渲染与交互 ---
+        switchTab(tab) {
+            this.stopGame();
+            this.stopLearning();
+            
+            UI.updateTabStyle(tab);
+            
+            ['learning', 'practice', 'exam'].forEach(t => {
+                const el = document.getElementById(`panel-${t}`);
+                if(t === tab) {
+                    el.classList.remove('hidden');
+                    // 淡入动画
+                    el.classList.remove('opacity-0');
+                    el.classList.add('animate-[fadeIn_0.3s]');
+                } else {
+                    el.classList.add('hidden');
+                }
+            });
+            this.state.mode = tab;
+        },
+
+        renderLearningGrid() {
+            const grid = document.getElementById('learning-grid');
+            grid.innerHTML = '';
+            Object.keys(HAND_SIGNS).forEach(key => {
+                if(key==='壬'||key==='祈') return;
+                const btn = document.createElement('div');
+                btn.className = "aspect-square bg-gray-700 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:bg-gray-600 hover:ring-2 hover:ring-orange-500 transition-all active:scale-95";
+                btn.innerHTML = `<span class="text-2xl font-bold">${key}</span><span class="text-xs text-gray-400">${HAND_SIGNS[key].code}</span>`;
+                btn.onclick = () => this.startLearning(key);
+                grid.appendChild(btn);
+            });
+        },
+
+        renderPracticeList() {
+            const list = document.getElementById('panel-practice');
+            list.innerHTML = '';
+            
+            const rankColors = { 'D': 'bg-gray-500', 'C': 'bg-blue-600', 'B': 'bg-green-600', 'A': 'bg-purple-600', 'S': 'bg-red-600' };
+
+            JUTSU_DB.forEach(j => {
+                const item = document.createElement('div');
+                item.className = "flex items-center justify-between p-3 bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors group";
+                item.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <span class="px-2 py-1 rounded text-xs font-bold text-white ${rankColors[j.rank]}">${j.rank}</span>
+                        <span class="font-bold text-gray-200 group-hover:text-white">${j.name}</span>
+                    </div>
+                    <span class="text-gray-500 text-sm group-hover:text-orange-400">开始 ▶</span>
+                `;
+                item.onclick = () => this.startGame(j);
+                list.appendChild(item);
+            });
+        },
+
+        // --- 动作控制 ---
+        startLearning(sign) {
+            this.state.targetSign = sign;
+            document.getElementById('learning-preview').classList.remove('hidden');
+            document.getElementById('preview-title').innerText = `${sign} (${HAND_SIGNS[sign].code})`;
+            document.getElementById('preview-img-text').innerText = sign;
+            document.getElementById('learning-status').innerText = "请结印...";
+            
+            // 滚动到底部
+            document.getElementById('panel-learning').scrollTo({top: 1000, behavior: 'smooth'});
+        },
+
+        stopLearning() {
+            this.state.targetSign = null;
+            document.getElementById('learning-preview').classList.add('hidden');
+        },
+
+        startGame(jutsu) {
+            this.state.currentJutsu = jutsu;
+            this.state.seqIndex = 0;
+            this.state.isPlaying = true;
+            this.state.startTime = performance.now();
+
+            // 隐藏面板，显示 HUD
+            document.getElementById('active-hud').classList.remove('hidden');
+            document.getElementById('hud-title').innerText = jutsu.name;
+            
+            // 渲染序列
+            const container = document.getElementById('hud-seq');
+            container.innerHTML = '';
+            jutsu.seq.forEach((s, i) => {
+                const el = document.createElement('div');
+                // 默认样式
+                el.className = i === 0 
+                    ? "w-10 h-12 flex items-center justify-center bg-gray-700 text-white rounded font-bold border-2 border-orange-500 scale-110 shadow-lg shadow-orange-500/50" 
+                    : "w-10 h-12 flex items-center justify-center bg-gray-800 text-gray-500 rounded font-bold";
+                el.innerText = s;
+                container.appendChild(el);
+            });
+        },
+
+        stopGame() {
+            this.state.isPlaying = false;
+            document.getElementById('active-hud').classList.add('hidden');
+        },
+
+        startExam() {
+            this.state.mode = 'exam';
+            this.state.examQueue = [
+                JUTSU_DB[1], // D (示例)
+                JUTSU_DB[6], // C
+                JUTSU_DB[8]  // B
+            ]; // 简单 Mock，实际应随机抽取
+            this.state.examIdx = 0;
+            
+            UI.showModal("考试开始", "你需要连续完成 3 个忍术。加油！", () => {
+                this.startGame(this.state.examQueue[0]);
+            });
+        },
+
+        nextExamItem() {
+            this.state.examIdx++;
+            if(this.state.examIdx >= this.state.examQueue.length) {
+                // 考试通过
+                UI.showModal("晋升成功!", "恭喜你通过了考试！", () => {
+                    this.stopGame();
+                    // 这里可以添加升级逻辑
+                });
+            } else {
+                setTimeout(() => {
+                    UI.showToast("下一题准备...", "warn");
+                    this.startGame(this.state.examQueue[this.state.examIdx]);
+                }, 1000);
+            }
+        },
+
+        updateRankDisplay() {
+            document.getElementById('player-rank').innerText = localStorage.getItem('ninja_rank') || "见习忍者";
+        }
+    };
+
+    // 启动
+    window.onload = () => Game.init();
+</script>
+</body>
+</html>
